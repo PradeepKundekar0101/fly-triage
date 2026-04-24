@@ -12,6 +12,16 @@ import (
 	"time"
 )
 
+// Set via -ldflags at build time for global install
+var projectDir string
+
+func resolvePath(relative string) string {
+	if projectDir != "" {
+		return filepath.Join(projectDir, relative)
+	}
+	return relative
+}
+
 type Diagnosis struct {
 	MachineID          string   `json:"machine_id"`
 	HostID             string   `json:"host_id"`
@@ -90,7 +100,7 @@ func main() {
 	}
 
 	// Write filtered output to temp file
-	tmpDir := "tmp"
+	tmpDir := resolvePath("tmp")
 	os.MkdirAll(tmpDir, 0o755)
 	tmpFile := filepath.Join(tmpDir, fmt.Sprintf("filtered_%d.json", time.Now().Unix()))
 
@@ -116,7 +126,7 @@ func main() {
 	fmt.Printf("\n  Analyzing with Claude Sonnet...\n")
 
 	// Execute Node agent
-	agentPath := filepath.Join("agent", "dist", "agent.js")
+	agentPath := resolvePath(filepath.Join("agent", "dist", "agent.js"))
 	cmd := exec.Command("node", agentPath, tmpFile)
 	cmd.Stderr = os.Stderr
 
