@@ -1,0 +1,9 @@
+# Node
+node_modules/
+agent/dist/
+
+# Temp files
+tmp/
+
+# OS
+.DS_Store
