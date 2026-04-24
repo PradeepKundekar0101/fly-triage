@@ -125,7 +125,52 @@ Respond with ONLY the recommended CLI command(s), one per line. No explanation.`
   return response.content[0].type === "text" ? response.content[0].text : "";
 }
 
+async function followup(filePath: string, question: string): Promise<void> {
+  const client = new Anthropic();
+  const raw = readFileSync(filePath, "utf-8");
+  const entries: LogEntry[] = JSON.parse(raw);
+
+  const logText = entries
+    .map((e) => `[${e.timestamp}] [${e.level}] [${e.source}] [${e.machine_id}] ${e.message}`)
+    .join("\n");
+
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1024,
+    system: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: "user",
+        content: `Here are the error/warning logs from a Fly.io telemetry dump:
+
+${logText}
+
+Based on these logs, answer this question:
+${question}
+
+Respond in plain text. Be specific and reference machine IDs, hosts, and timestamps where relevant.`,
+      },
+    ],
+  });
+
+  const text = response.content[0].type === "text" ? response.content[0].text : "";
+  console.log(text);
+}
+
 async function main(): Promise<void> {
+  // Check for --followup mode
+  if (process.argv[2] === "--followup") {
+    const filePath = process.argv[3];
+    const question = process.argv[4];
+    if (!filePath || !question) {
+      console.error("Usage: node agent.js --followup <filtered-logs.json> <question>");
+      process.exit(1);
+    }
+    await followup(filePath, question);
+    return;
+  }
+
+  // Normal diagnosis mode
   const filePath = process.argv[2];
   if (!filePath) {
     console.error("Usage: node agent.js <filtered-logs.json>");
@@ -143,7 +188,6 @@ async function main(): Promise<void> {
     try {
       parsed = JSON.parse(analysis);
     } catch {
-      // If LLM didn't return clean JSON, extract what we can
       parsed = {
         root_cause: analysis,
         severity: "warning",
@@ -163,7 +207,6 @@ async function main(): Promise<void> {
     });
   }
 
-  // Output JSON to stdout
   console.log(JSON.stringify(diagnoses, null, 2));
 }
 
